@@ -88,22 +88,15 @@ Include in your output the name of the court, and the name of the member
 formatted as a single column. Ensure no duplicate data, and order by
 the member name. */
 
--- code didn't work 
-SELECT DISTINCT CONCAT(m.firstname, ' ', m.surname, ' ', f.name) AS membercourt,
-FROM Members AS m
-JOIN Bookings AS b using(memid)
-JOIN Facilities AS f using(facid)
-WHERE f.facid IN (0,1)
+SELECT DISTINCT CONCAT (m.firstname, ' ', m.surname, ' ', f.name) AS membercourt
+FROM Members m
+JOIN Bookings b
+USING (memid)
+JOIN Facilities f
+USING (facid)
+WHERE b.facid
+IN (0, 1)
 ORDER BY membercourt;
-
--- The code below works
-
-SELECT DISTINCT m.firstname, m.surname, f.name
-FROM Members AS m
-JOIN Bookings AS b using(memid)
-JOIN Facilities AS f using(facid)
-WHERE f.facid IN (0,1)
-ORDER BY m.firstname;
 
 /* Q8: Produce a list of bookings on the day of 2012-09-14 which
 will cost the member (or guest) more than $30. Remember that guests have
@@ -112,9 +105,36 @@ the guest user's ID is always 0. Include in your output the name of the
 facility, the name of the member formatted as a single column, and the cost.
 Order by descending cost, and do not use any subqueries. */
 
+SELECT CONCAT ( f.name, ' ', m.firstname, ' ', m.surname ) AS sept14data,
+	CASE 
+		WHEN memid =0 THEN slots * guestcost
+		ELSE slots * membercost
+	END AS cost
+FROM Bookings b
+LEFT JOIN Facilities f
+USING ( facid )
+LEFT JOIN Members m
+USING ( memid )
+WHERE starttime LIKE '2012-09-14%'
+HAVING cost >30
+ORDER BY cost DESC;
 
 /* Q9: This time, produce the same result as in Q8, but using a subquery. */
 
+SELECT CONCAT ( name, ' ', firstname, ' ', surname ) AS sept14data,
+	CASE 
+		WHEN memid =0 THEN slots * guestcost
+		ELSE slots * membercost
+	END AS cost
+FROM 
+	(SELECT * FROM Bookings
+	WHERE starttime LIKE '2012-09-14%') AS sept_bookings
+LEFT JOIN Facilities
+USING ( facid )
+LEFT JOIN Members
+USING ( memid )
+HAVING cost > 30
+ORDER BY cost DESC;
 
 /* PART 2: SQLite
 /* We now want you to jump over to a local instance of the database on your machine. 
@@ -136,11 +156,41 @@ QUESTIONS:
 The output of facility name and total revenue, sorted by revenue. Remember
 that there's a different cost for guests and members! */
 
+SELECT name, SUM(
+	CASE 
+    	WHEN memid =0 THEN slots * guestcost
+    	ELSE slots * membercost
+	END ) AS revenue
+FROM Bookings
+LEFT JOIN Facilities
+USING ( facid )
+GROUP BY name
+HAVING revenue <1000;
+
 /* Q11: Produce a report of members and who recommended them in alphabetic surname,firstname order */
 
+SELECT (a.surname ||', '|| a.firstname ) AS members, ( b.surname || ', '|| b.firstname ) AS recommended_by
+FROM Members a, Members b
+WHERE a.recommendedby >0
+AND a.recommendedby = b.memid
+ORDER BY b.surname;
 
 /* Q12: Find the facilities with their usage by member, but not guests */
 
+SELECT name, ( firstname ||' '|| surname ) AS member_name, COUNT( surname ) AS 'usage'
+FROM Bookings
+LEFT JOIN Facilities
+USING ( facid )
+LEFT JOIN Members
+USING ( memid )
+WHERE memid !=0
+GROUP BY name, member_name;
 
 /* Q13: Find the facilities usage by month, but not guests */
 
+SELECT EXTRACT(MONTH FROM starttime ) AS MONTH , name, COUNT( name ) AS 'usage'
+FROM Bookings
+LEFT JOIN Facilities
+USING ( facid )
+WHERE memid !=0
+GROUP BY MONTH , name;
